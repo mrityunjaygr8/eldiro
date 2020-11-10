@@ -1,12 +1,33 @@
-pub(crate) fn extract_digits(s: &str) -> (&str, &str) {
-    let digits_end = s
+pub(crate) fn take_while(accept: impl Fn(char) -> bool, s: &str) -> (&str, &str) {
+    let extracted_end = s
         .char_indices()
-        .find_map(|(idx, c)| if c.is_ascii_digit() { None } else { Some(idx) })
+        .find_map(|(idx, c)| if accept(c) { None } else { Some(idx) })
         .unwrap_or_else(|| s.len());
 
-    let digits = &s[..digits_end];
-    let remainder = &s[digits_end..];
-    (remainder, digits)
+    let extracted = &s[..extracted_end];
+    let remainder = &s[extracted_end..];
+    (remainder, extracted)
+}
+pub(crate) fn extract_digits(s: &str) -> (&str, &str) {
+    take_while(| c | c.is_ascii_digit(), s)
+}
+
+pub(crate) fn extract_whitespace(s: &str) -> (&str, &str) {
+    take_while(| c | c == ' ', s)
+}
+
+pub(crate) fn extract_ident(s: &str) -> (&str, &str) {
+    let input_starts_with_alphabetic = s
+        .chars()
+        .next()
+        .map(|c| c.is_ascii_alphabetic())
+        .unwrap_or(false);
+
+    if input_starts_with_alphabetic {
+        take_while(| c | c.is_ascii_alphanumeric(), s)
+    } else {
+        (s, "")
+    }
 }
 
 pub(crate) fn extract_op(s: &str) -> (&str, &str) {
@@ -16,6 +37,14 @@ pub(crate) fn extract_op(s: &str) -> (&str, &str) {
     }
 
     (&s[1..], &s[0..1])
+}
+
+pub(crate) fn tag<'a, 'b>(starting_text: &'a str, s: &'b str) -> &'b str {
+    if s.starts_with(starting_text) {
+        &s[starting_text.len()..]
+    } else {
+        panic!("expected {}", starting_text);
+    }
 }
 
 #[cfg(test)]
@@ -60,5 +89,30 @@ mod tests {
     #[test]
     fn extract_div() {
         assert_eq!(extract_op("/8"), ("8", "/"));
+    }
+
+    #[test]
+    fn extract_spaces() {
+        assert_eq!(extract_whitespace("  1"), ("1", "  "));
+    }
+
+    #[test]
+    fn extract_alphabetic_ident() {
+        assert_eq!(extract_ident("asdASD stop"), (" stop", "asdASD"))
+    }
+
+    #[test]
+    fn extract_alphanumeric_ident() {
+        assert_eq!(extract_ident("foobar1()"), ("()", "foobar1"))
+    }
+
+    #[test]
+    fn cannot_extract_ident_beginning_with_number() {
+        assert_eq!(extract_ident("123foobar1"), ("123foobar1", ""))
+    }
+
+    #[test]
+    fn tag_word() {
+        assert_eq!(tag("let", "let a"), " a");
     }
 }
